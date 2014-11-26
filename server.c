@@ -117,7 +117,7 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
 void output_header_and_targeted_file_to_sock(int sock, int resource)
 {
     int n;
-    char data_to_send[1024]; //the packet's data
+    char data_to_send[DATA_SIZE_IN_PACKET]; //the packet's data
     int bytes_read;
 
     struct TCP_PACKET_FORMAT tcp_packet;
@@ -127,7 +127,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
     char lastFlag = 0;
     int windowSize;
     
-    // Divide target file into 1024-byte packets
+    // Divide target file into DATA)SIZE_IN_PACKET byte packets
     while ((bytes_read=read(resource, data_to_send, DATA_SIZE_IN_PACKET))>0 ){
       if (bytes_read < DATA_SIZE_IN_PACKET) // if it's the last packet
         lastFlag = 1;
@@ -137,7 +137,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
       if (n < 0) error("ERROR writing packet to socket");
       seqNumber++;
     }
-    printf("bytes_read=%d",bytes_read);
+    printf("bytes_read=%d\n",bytes_read);
 }
 
 /* Output an error when requested file doesn't exist */
