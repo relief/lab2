@@ -127,7 +127,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
     char lastFlag = 0;
     int windowSize;
     
-    // Divide target file into 1480-byte packets
+    // Divide target file into DATA)SIZE_IN_PACKET byte packets
     while ((bytes_read=read(resource, data_to_send, DATA_SIZE_IN_PACKET))>0 ){
       if (bytes_read < DATA_SIZE_IN_PACKET) // if it's the last packet
         lastFlag = 1;
