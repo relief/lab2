@@ -64,8 +64,9 @@ int main(int argc, char *argv[])
     //bzero(buffer,256);
 
     // Receive packets from the server
-    fp=fopen(buffer, "w");
-    do{
+    fp = fopen(buffer, "w");
+    do
+    {
         n = recvfrom(sockfd,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&serv_addr,&servlen); //read from the socket
         if (n < 0) 
               error("ERROR reading from socket");
