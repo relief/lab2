@@ -121,21 +121,52 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
     int bytes_read;
 
     struct TCP_PACKET_FORMAT tcp_packet;
+    struct TCP_PACKET_FORMAT ack_packet;
     int seqNumber = 1;
     int ackNumber;
-    char ackFlag;
+    char ackFlag = 0;
     char lastFlag = 0;
-    int windowSize;
+    int windowSize = 100;
+    int window[windowSize];
+    int windowAcks[windowSize];
+
+    //Initialize the window with sequence numbers
+    for (int i = 0; i < windowSize; i++) {
+      window[i] = i;
+    }
+    // Initialize the window for ACK status (0 = unacked, 1 = acked)
+    for (int i = 0; i < windowSize; i++) {
+      windowAcks[i] = 0;
+    }
     
     // Divide target file into DATA)SIZE_IN_PACKET byte packets
     while ((bytes_read=read(resource, data_to_send, DATA_SIZE_IN_PACKET))>0 ){
+      //if timer ends, resend the associated packet
+
       if (bytes_read < DATA_SIZE_IN_PACKET) // if it's the last packet
         lastFlag = 1;
-      
+
       printf("New packet! ");
       tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, data_to_send, bytes_read);
       n = sendto(sock,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&cli_addr,clilen);
       if (n < 0) error("ERROR writing packet to socket");
+      //start timer
+
+      //Receive ACKs from client
+      n = recvfrom(sockfd,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen);
+      if (n < 0) error("ERROR receiving ACK from client");
+      printf("ackFlag: %d\n",ack_packet.ackFlag);
+      printf("ackNumber: %d\n",ack_packet.ackNumber);
+
+      if (ack_packet.ackFlag == 1) {
+        // stop timer for seqNumber = ackNumber
+        // mark window as acked (something like a hash table?)
+        windowAcks[ack_packet.seqNumber] = 1;
+        // if smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
+
+        ack_packet.ackNumber
+      }
+
       
       seqNumber++;
       printf("bytes_read = %d\n",bytes_read);
