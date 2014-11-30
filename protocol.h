@@ -22,6 +22,24 @@ struct WINDOW_FORMAT
 	clock_t  timer[WINDOW_SIZE];
 };
 
+short calCheckSum(struct TCP_PACKET_FORMAT p){
+	int i;
+	short sum = 0;
+	sum += p.seqNumber + p.ackNumber + p.ackFlag + p.lastFlag + p.dataLength + p.windowSize;
+	for (i = 0;i < DATA_SIZE_IN_PACKET; i++)
+		sum += p.data[i];
+	return sum;
+}
+
+int lossByRate(float rate){
+    float r;
+    srand(time(NULL));
+    r = (float)rand()/(float)RAND_MAX;
+    if (r < rate)
+        return 1;
+    return 0;
+}
+
 struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ackFlag, char lastFlag, int windowSize, 
                                             char *data, int dataSize) 
 {
@@ -46,20 +64,3 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     return tcp_packet;
 }
 
-short calCheckSum(struct TCP_PACKET_FORMAT p){
-	int i;
-	short sum = 0;
-	sum += p.seqNumber + p.ackNumber + p.ackFlag + p.lastFlag + p.dataLength + p.windowSize;
-	for (i = 0;i < DATA_SIZE_IN_PACKET; i++)
-		sum += p.data[i];
-	return sum;
-}
-
-int lossByRate(float rate){
-    float r;
-    srand(time(NULL));
-    r = (float)rand()/(float)RAND_MAX;
-    if (r < rate)
-        return 1;
-    return 0;
-}
