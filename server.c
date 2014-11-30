@@ -12,6 +12,7 @@
 #include <sys/wait.h>	/* for the waitpid() system call */
 #include <signal.h>	/* signal name macros, and the kill() prototype */
 #include <fcntl.h>
+#include <time.h>
 #include "protocol.h"
 
 //struct TCP_PACKET_FORMAT tcp_packet;
@@ -33,7 +34,7 @@ struct sockaddr_in cli_addr;
 
 int main(int argc, char *argv[])
 {
-     int sockfd, newsockfd, portno, pid;
+     int sockfd, newsockfd, portno, pid, msec;
      struct sigaction sa;          // for signal SIGCHLD
      struct sockaddr_in serv_addr;
 
@@ -65,15 +66,20 @@ int main(int argc, char *argv[])
          exit(1);
      }
      /*********************************/
+
      
+
+
      while (1) {
          int n = -1;
          clilen = sizeof(cli_addr);         
          bzero(buffer,256);
-         while (n < 0)
-            n = recvfrom(sockfd,buffer,255,0,(struct sockaddr *)&cli_addr,&clilen);
+
+         n = recvfrom(sockfd,buffer,255,0,(struct sockaddr *)&cli_addr,&clilen);
          dostuff(sockfd); 
      }
+
+     
      return 0; /* we never get here */
 }
 
@@ -101,6 +107,7 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     //tcp_packet.data[0]   = 'a';
     //tcp_packet.data[1]   = 'o';
     //tcp_packet.data[2]   = '\0';
+    
 
     bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
     for (i = 0; i < packetSize; i++) {
@@ -109,67 +116,96 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     //for (; i < DATA_SIZE_IN_PACKET; i++) {
     //  tcp_packet.data[i] = '/0';
     //}
-
+    
+    tcp_packet.checksum  = calCheckSum(tcp_packet);
     return tcp_packet;
 }
-
+void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
+    int n;
+    n = sendto(sock,&packet,sizeof(packet),0,(struct sockaddr *)&cli_addr,clilen);
+    if (n < 0) error("ERROR writing packet to socket"); 
+}
 /* Divide file into packets and send them to the receiver */
 void output_header_and_targeted_file_to_sock(int sock, int resource)
 {
-    int n;
+    int n, i;
     char data_to_send[DATA_SIZE_IN_PACKET]; //the packet's data
     int bytes_read;
-
-    struct TCP_PACKET_FORMAT tcp_packet;
-    struct TCP_PACKET_FORMAT ack_packet;
-    int seqNumber = 1;
-    int ackNumber;
-    char ackFlag = 0;
-    char lastFlag = 0;
-    int windowSize = 100;
-    int window[windowSize];
-    int windowAcks[windowSize];
-
-    //Initialize the window with sequence numbers
-    for (int i = 0; i < windowSize; i++) {
-      window[i] = i;
+    struct WINDOW_FORMAT window;
+    struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
+    int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index;
+    int packetNum = 0;
+    clock_t start, curTime;
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000;
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+        perror("Error");
     }
-    // Initialize the window for ACK status (0 = unacked, 1 = acked)
-    for (int i = 0; i < windowSize; i++) {
-      windowAcks[i] = 0;
-    }
-    
-    // Divide target file into DATA)SIZE_IN_PACKET byte packets
-    while ((bytes_read=read(resource, data_to_send, DATA_SIZE_IN_PACKET))>0 ){
-      //if timer ends, resend the associated packet
 
-      if (bytes_read < DATA_SIZE_IN_PACKET) // if it's the last packet
-        lastFlag = 1;
+    seqNumber = 0;
+    lastFlag  = 0;
+    ackNumber = 0;
+    ackFlag   = 0;
+    windowSize= WINDOW_SIZE;
 
-      printf("New packet! ");
-      tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, data_to_send, bytes_read);
-      n = sendto(sock,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&cli_addr,clilen);
-      if (n < 0) error("ERROR writing packet to socket");
-      //start timer
+    while (1){
 
-      //Receive ACKs from client
-      n = recvfrom(sockfd,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen);
-      if (n < 0) error("ERROR receiving ACK from client");
-      printf("ackFlag: %d\n",ack_packet.ackFlag);
-      printf("ackNumber: %d\n",ack_packet.ackNumber);
+          // Put available packets into window and send them
+          while (packetNum < WINDOW_SIZE && lastFlag == 0){
+              if ((bytes_read=read(resource, data_to_send, DATA_SIZE_IN_PACKET))>0 ){
+                  // Create packet
+                  if (bytes_read < DATA_SIZE_IN_PACKET) // if it's the last packet
+                      lastFlag = 1;
+                  tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, data_to_send, bytes_read);
+                  // Save into window
+                  printf("New packet added into Window! \n");
+                  window.packet[packetNum] = tcp_packet;
+                  window.timer[packetNum] = clock();
+                  packetNum += 1;
+                  // Send it
+                  SendPacket(sock,tcp_packet);
+                  seqNumber += DATA_SIZE_IN_PACKET;
+              }
+          }
 
-      if (ack_packet.ackFlag == 1) {
-        // stop timer for seqNumber = ackNumber
-        // mark window as acked (something like a hash table?)
-        windowAcks[ack_packet.seqNumber] = 1;
-        // if smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
+          //Receive ACK
+          while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
+              printf("ackFlag: %d\n",ack_packet.ackFlag);
+              printf("ackNumber: %d\n",ack_packet.ackNumber);
+              if (ack_packet.ackFlag == 1) {
+                  index = 0 + (ack_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
+                  window.packet[index].seqNumber = -1;
+              }        
+          }
 
-        ack_packet.ackNumber
-      }
+          // if smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
+          firstWaitingWin = 0;
+          while (window.packet[firstWaitingWin].seqNumber < 0)
+              firstWaitingWin += 1;
 
-      
-      seqNumber++;
-      printf("bytes_read = %d\n",bytes_read);
+          if (firstWaitingWin > 0){
+              packetNum -= firstWaitingWin;
+              if (packetNum == 0 && lastFlag > 0){
+                  break;
+              }
+              for (i = 0; i < packetNum; i++)
+              {
+                  window.packet[i]   = window.packet[i+firstWaitingWin];
+                  window.timer[i] = window.timer[i+firstWaitingWin];
+              }
+          }
+
+          // If timeout, resend
+          curTime = clock();
+          for (i = 0; i < packetNum; i++)
+          {
+              if (window.packet[i].seqNumber >= 0 && curTime - window.timer[i] > TIMEOUT)
+              {
+                  SendPacket(sock,window.packet[i]);
+                  window.timer[i] = clock();
+              }
+          }
     }
 }
 
