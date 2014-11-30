@@ -65,9 +65,6 @@ int main(int argc, char *argv[])
      }
      /*********************************/
 
-     
-     
-
      while (1) {
          int n = -1;
          clilen = sizeof(cli_addr);         
@@ -100,8 +97,7 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     tcp_packet.windowSize = windowSize;
     tcp_packet.dataLength = dataSize;
 
-    printf("sequence number = %d\n", seqNumber);      
-    
+    //printf("sequence number = %d\n", seqNumber);      
 
     bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
     for (i = 0; i < dataSize; i++) {
@@ -123,7 +119,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
     int bytes_read,n, i;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index,packetNum;
+    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, packetNum;
     clock_t start, curTime;
     struct timeval tv;
     
@@ -155,14 +151,15 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
                   packetNum += 1;
                   // Send it
                   SendPacket(sock,tcp_packet);
+                  printf("Server: sent packet SeqNum %d\n", seqNumber);
                   seqNumber += DATA_SIZE_IN_PACKET;
               }
           }
 
           //Receive ACK
           while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
-              printf("ackFlag: %d\n",ack_packet.ackFlag);
-              printf("ackNumber: %d\n",ack_packet.ackNumber);
+              printf("Server rcvd ackFlag: %d\n",ack_packet.ackFlag);
+              printf("Server rcvd ackNumber: %d\n",ack_packet.ackNumber);
 
               if (ack_packet.ackFlag == 1) {
                   index = 0 + (ack_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;

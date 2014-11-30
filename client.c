@@ -85,7 +85,7 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     tcp_packet.windowSize = windowSize;
     tcp_packet.dataLength = packetSize;
 
-    printf("sequence number = %d\n", seqNumber);      
+    //printf("sequence number = %d\n", seqNumber);      
 
     bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
     for (i = 0; i < packetSize; i++) {
@@ -109,8 +109,8 @@ void dostuff(int sockfd) {
     int n, i;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index,bytes_read;
-    int packetNum = 0;
+    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, bytes_read;
+    //int packetNum = 0;
 
     seqNumber = 0;
     lastFlag  = 0;
@@ -141,10 +141,11 @@ void dostuff(int sockfd) {
         printf("%s\n",tcp_packet.data);
         // mark window as received
         index = 0 + (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
+        window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
 
         // construct an ACK packet
-        seqNumber += tcp_packet.dataLength; //change later
+        seqNumber += tcp_packet.dataLength;
         ackFlag = 1;
         ackNumber = tcp_packet.seqNumber;
         lastFlag = 1;
@@ -153,21 +154,20 @@ void dostuff(int sockfd) {
         // send the ACK
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         SendPacket(sockfd,ack_packet);
+        printf("Client: ACK %d\n", seqNumber);
 
-        // Append packet into file
-        fwrite(tcp_packet.data, 1, tcp_packet.dataLength, fp);
+        // Append packet into file; MUST BE IN ORDER
+        //fwrite(tcp_packet.data, 1, tcp_packet.dataLength, fp);
 
         // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
         firstWaitingWin = 0;
         while (window.packet[firstWaitingWin].seqNumber < 0)
             firstWaitingWin += 1;
         if (firstWaitingWin > 0) {
-            packetNum -= firstWaitingWin;
-            if (packetNum == 0 && lastFlag > 0){
-                break;
-            }
-            for (i = 0; i < packetNum; i++)
+            for (i = 0; i < windowSize-firstWaitingWin; i++)
             {
+                // Append packet about to be shifted out of the window into file; MUST BE IN ORDER
+                fwrite(window.packet[i].data, 1, window.packet[i].dataLength, fp);
                 window.packet[i] = window.packet[i+firstWaitingWin];
             }
         }
