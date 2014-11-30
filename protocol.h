@@ -22,6 +22,12 @@ struct WINDOW_FORMAT
 	clock_t  timer[WINDOW_SIZE];
 };
 
+void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
+    int n;
+    n = sendto(sock,&packet,sizeof(packet),0,(struct sockaddr *)&cli_addr,clilen);
+    if (n < 0) error("ERROR writing packet to socket"); 
+}
+
 short calCheckSum(struct TCP_PACKET_FORMAT p){
 	int i;
 	short sum = 0;
@@ -39,3 +45,28 @@ int lossByRate(float rate){
         return 1;
     return 0;
 }
+
+struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ackFlag, char lastFlag, int windowSize, 
+                                            char *data, int dataSize) 
+{
+    struct TCP_PACKET_FORMAT tcp_packet;
+    int i = 0;
+
+    tcp_packet.seqNumber  = seqNumber;
+    tcp_packet.ackNumber  = ackNumber;
+    tcp_packet.ackFlag    = ackFlag;
+    tcp_packet.lastFlag   = lastFlag;
+    tcp_packet.windowSize = windowSize;
+    tcp_packet.dataLength = dataSize;
+
+    printf("sequence number = %d\n", seqNumber);      
+
+    bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
+    for (i = 0; i < dataSize; i++) {
+       tcp_packet.data[i] = data[i];
+    }
+
+    tcp_packet.checksum  = calCheckSum(tcp_packet);
+    return tcp_packet;
+}
+
