@@ -72,13 +72,6 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
-    int n;
-
-    n = sendto(sockfd,buffer,strlen(buffer),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
-    if (n < 0) error("ERROR writing to socket");
-}
-
 void dostuff(int sockfd) {
     FILE *fp; // file requested
 
