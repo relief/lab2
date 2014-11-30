@@ -87,30 +87,6 @@ int main(int argc, char *argv[])
  once a connnection has been established.
  *****************************************/
 
-struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ackFlag, char lastFlag, int windowSize, 
-                                            char *data, int dataSize) 
-{
-    struct TCP_PACKET_FORMAT tcp_packet;
-    int i = 0;
-
-    tcp_packet.seqNumber  = seqNumber;
-    tcp_packet.ackNumber  = ackNumber;
-    tcp_packet.ackFlag    = ackFlag;
-    tcp_packet.lastFlag   = lastFlag;
-    tcp_packet.windowSize = windowSize;
-    tcp_packet.dataLength = dataSize;
-
-    printf("sequence number = %d\n", seqNumber);      
-    
-
-    bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
-    for (i = 0; i < dataSize; i++) {
-       tcp_packet.data[i] = data[i];
-    }
-
-    tcp_packet.checksum  = calCheckSum(tcp_packet);
-    return tcp_packet;
-}
 void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
     int n;
     n = sendto(sock,&packet,sizeof(packet),0,(struct sockaddr *)&cli_addr,clilen);

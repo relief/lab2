@@ -72,30 +72,6 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ackFlag, char lastFlag, int windowSize, 
-                                            char *data, int packetSize) 
-{
-    struct TCP_PACKET_FORMAT tcp_packet;
-    int i = 0;
-
-    tcp_packet.seqNumber  = seqNumber;
-    tcp_packet.ackNumber  = ackNumber;
-    tcp_packet.ackFlag    = ackFlag;
-    tcp_packet.lastFlag   = lastFlag;
-    tcp_packet.windowSize = windowSize;
-    tcp_packet.dataLength = packetSize;
-
-    printf("sequence number = %d\n", seqNumber);      
-
-    bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
-    for (i = 0; i < packetSize; i++) {
-      tcp_packet.data[i] = data[i];
-    }
-
-    return tcp_packet;
-}
-
-
 void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
     int n;
 
@@ -106,7 +82,7 @@ void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
 void dostuff(int sockfd) {
     FILE *fp; // file requested
 
-    int n, i;
+    int n, i, x;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
     int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index,bytes_read;
@@ -120,7 +96,7 @@ void dostuff(int sockfd) {
     bytes_read = 0;
 
     // Initialize the client window with blank packets
-    for (int x; x < windowSize; x++) {
+    for (x = 0; x < windowSize; x++) {
         tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, bytes_read);
         window.packet[x] = tcp_packet;
     }
