@@ -18,6 +18,13 @@ void error(char *msg)
     exit(0);
 }
 
+void dostuff(int); /* function prototype */
+
+char buffer[256];
+struct sockaddr_in serv_addr;
+struct hostent *server; //contains tons of information, including the server's IP address
+socklen_t servlen;
+
 int main(int argc, char *argv[])
 {
     struct TCP_PACKET_FORMAT tcp_packet;
@@ -25,14 +32,6 @@ int main(int argc, char *argv[])
 
     int sockfd; //Socket descriptor
     int portno, n;
-    struct sockaddr_in serv_addr;
-    struct hostent *server; //contains tons of information, including the server's IP address
-    char buffer[256];
-    FILE *fp; // file requested
-
-    // for TCP packets containing ACKS
-    int seqNumber = 0, ackNumber, windowSize, data_to_send;
-    char ackFlag, lastFlag;
 
     if (argc < 3) {
        fprintf(stderr,"usage %s hostname port\n", argv[0]);
@@ -59,7 +58,7 @@ int main(int argc, char *argv[])
     bzero(buffer,256);
     fgets(buffer,255,stdin);
     buffer[strlen(buffer)-1] = '\0';
-    socklen_t servlen = sizeof(serv_addr);     
+    servlen = sizeof(serv_addr);     
 
     //n = send(sockfd,buffer,strlen(buffer),0); //send to the socket
     n = sendto(sockfd,buffer,strlen(buffer),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
@@ -67,18 +66,63 @@ int main(int argc, char *argv[])
          error("ERROR writing to socket");
 
     //bzero(buffer,256);    
+    dostuff(sockfd);
+    close(sockfd); //close socket
+    
+    return 0;
+}
 
-    // The client-side window of packet sequence numbers
-    int windowSize = 100;
-    int windowRcvd[windowSize];
+struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ackFlag, char lastFlag, int windowSize, 
+                                            char *data, int packetSize) 
+{
+    struct TCP_PACKET_FORMAT tcp_packet;
+    int i = 0;
 
-    //Initialize the window with sequence numbers
-    for (int i = 0; i < windowSize; i++) {
-      window[i] = i;
+    tcp_packet.seqNumber  = seqNumber;
+    tcp_packet.ackNumber  = ackNumber;
+    tcp_packet.ackFlag    = ackFlag;
+    tcp_packet.lastFlag   = lastFlag;
+    tcp_packet.windowSize = windowSize;
+    tcp_packet.dataLength = packetSize;
+
+    printf("sequence number = %d\n", seqNumber);      
+
+    bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
+    for (i = 0; i < packetSize; i++) {
+      tcp_packet.data[i] = data[i];
     }
-    // Initialize the window for received status (0 = received, 1 = not received)
-    for (int i = 0; i < windowSize; i++) {
-      windowRcvd[i] = 0;
+
+    return tcp_packet;
+}
+
+
+void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
+    int n;
+
+    n = sendto(sockfd,buffer,strlen(buffer),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
+    if (n < 0) error("ERROR writing to socket");
+}
+
+void dostuff(int sockfd) {
+    FILE *fp; // file requested
+
+    int n, i;
+    struct WINDOW_FORMAT window;
+    struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
+    int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index,bytes_read;
+    int packetNum = 0;
+
+    seqNumber = 0;
+    lastFlag  = 0;
+    ackNumber = 0;
+    ackFlag   = 0;
+    windowSize = WINDOW_SIZE;
+    bytes_read = 0;
+
+    // Initialize the client window with blank packets
+    for (int x; x < windowSize; x++) {
+        tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, bytes_read);
+        window.packet[x] = tcp_packet;
     }
 
     // Receive packets from the server
@@ -86,15 +130,18 @@ int main(int argc, char *argv[])
     do
     {
         n = recvfrom(sockfd,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&serv_addr,&servlen); //read from the socket
-        if (n < 0) 
-              error("ERROR reading from socket");
+        if (n < 0) {
+            error("ERROR reading from socket");
+            break;
+        }
         printf("%d\n",tcp_packet.seqNumber);
         printf("%d\n",tcp_packet.ackNumber);
         printf("%d\n",tcp_packet.ackFlag);
         printf("%d\n",tcp_packet.lastFlag);
         printf("%s\n",tcp_packet.data);
-        // mark window as received (something like a hash table?)
-        windowRcvd[tcp_packet.seqNumber] = 0;
+        // mark window as received
+        index = 0 + (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
+        window.packet[index].seqNumber = -1;
 
         // construct an ACK packet
         seqNumber += tcp_packet.dataLength; //change later
@@ -102,22 +149,29 @@ int main(int argc, char *argv[])
         ackNumber = tcp_packet.seqNumber;
         lastFlag = 1;
         windowSize = tcp_packet.windowSize;
-        data_to_send = NULL;
 
-        // send the ACK packet
-        ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, data_to_send, 0);
-        n = sendto(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&serv_addr,servlen);
-        if (n < 0) error("ERROR writing packet to socket");
+        // send the ACK
+        ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
+        SendPacket(sockfd,ack_packet);
 
         // Append packet into file
         fwrite(tcp_packet.data, 1, tcp_packet.dataLength, fp);
 
         // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
+        firstWaitingWin = 0;
+        while (window.packet[firstWaitingWin].seqNumber < 0)
+            firstWaitingWin += 1;
+        if (firstWaitingWin > 0) {
+            packetNum -= firstWaitingWin;
+            if (packetNum == 0 && lastFlag > 0){
+                break;
+            }
+            for (i = 0; i < packetNum; i++)
+            {
+                window.packet[i] = window.packet[i+firstWaitingWin];
+            }
+        }
 
     } while (tcp_packet.lastFlag == 0); //keep reading files from server until reaches the last packet
     fclose(fp);
-
-    close(sockfd); //close socket
-    
-    return 0;
 }

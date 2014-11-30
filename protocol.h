@@ -4,6 +4,7 @@
 #define LOSS_RATE	 0.1
 #define CORRUPTED_RATE 0.2
 #define RECEIVING_WAITING_TIME 100000
+
 struct TCP_PACKET_FORMAT{
     int seqNumber;
     int ackNumber;
