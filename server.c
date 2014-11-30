@@ -34,7 +34,7 @@ struct sockaddr_in cli_addr;
 
 int main(int argc, char *argv[])
 {
-     int sockfd, newsockfd, portno, pid, msec;
+     int sockfd, newsockfd, portno;
      struct sigaction sa;          // for signal SIGCHLD
      struct sockaddr_in serv_addr;
 
@@ -54,8 +54,6 @@ int main(int argc, char *argv[])
      if (bind(sockfd, (struct sockaddr *) &serv_addr,
               sizeof(serv_addr)) < 0) 
               error("ERROR on binding");
-          
-     //clilen = sizeof(cli_addr);
      
      /****** Kill Zombie Processes ******/
      sa.sa_handler = sigchld_handler; // reap all dead processes
@@ -68,7 +66,7 @@ int main(int argc, char *argv[])
      /*********************************/
 
      
-
+     
 
      while (1) {
          int n = -1;
@@ -90,7 +88,7 @@ int main(int argc, char *argv[])
  *****************************************/
 
 struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ackFlag, char lastFlag, int windowSize, 
-                                            char *data, int packetSize) 
+                                            char *data, int dataSize) 
 {
     struct TCP_PACKET_FORMAT tcp_packet;
     int i = 0;
@@ -100,13 +98,13 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     tcp_packet.ackFlag    = ackFlag;
     tcp_packet.lastFlag   = lastFlag;
     tcp_packet.windowSize = windowSize;
-    tcp_packet.dataLength = packetSize;
+    tcp_packet.dataLength = dataSize;
 
     printf("sequence number = %d\n", seqNumber);      
     
 
     bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
-    for (i = 0; i < packetSize; i++) {
+    for (i = 0; i < dataSize; i++) {
        tcp_packet.data[i] = data[i];
     }
 
@@ -127,10 +125,10 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
     int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index,packetNum;
     clock_t start, curTime;
-    
     struct timeval tv;
+    
     tv.tv_usec = RECEIVING_WAITING_TIME;
-    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
         perror("Error");
     }
 
