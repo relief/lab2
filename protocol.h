@@ -53,7 +53,7 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     tcp_packet.windowSize = windowSize;
     tcp_packet.dataLength = dataSize;
 
-    printf("sequence number = %d\n", seqNumber);      
+    //printf("sequence number = %d\n", seqNumber);      
 
     bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
     for (i = 0; i < dataSize; i++) {
