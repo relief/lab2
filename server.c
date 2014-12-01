@@ -65,14 +65,14 @@ int main(int argc, char *argv[])
      }
      /*********************************/
 
-     while (1) {
+     //while (1) {
          int n = -1;
          clilen = sizeof(cli_addr);         
          bzero(buffer,256);
 
          n = recvfrom(sockfd,buffer,255,0,(struct sockaddr *)&cli_addr,&clilen);
          dostuff(sockfd); 
-     }
+     //}
 
      
      return 0; /* we never get here */
@@ -133,7 +133,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
                   seqNumber += DATA_SIZE_IN_PACKET;
               }
           }
-
+          
           //Receive ACK
           while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
               printf("Server rcvd ackFlag: %d\n",ack_packet.ackFlag);

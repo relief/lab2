@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
     int n;
 
-    n = sendto(sockfd,buffer,strlen(buffer),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
+    n = sendto(sockfd,&packet,sizeof(packet),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) error("ERROR writing to socket");
 }
 
@@ -131,7 +131,7 @@ void dostuff(int sockfd) {
         // send the ACK
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         SendPacket(sockfd,ack_packet);
-        printf("Client: ACK %d\n", ackNumber);
+        printf("Client: ACK %d\n", ack_packet.ackNumber);
         
 
         // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
@@ -145,6 +145,7 @@ void dostuff(int sockfd) {
                 fwrite(window.packet[i].data, 1, window.packet[i].dataLength, fp);
                 // end after we write the last packet into file
                 if (window.packet[i].lastFlag == 1) {
+                    close(sockfd);
                     fclose(fp);
                     return;
                 }
