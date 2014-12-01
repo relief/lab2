@@ -22,12 +22,6 @@ struct WINDOW_FORMAT
 	clock_t  timer[WINDOW_SIZE];
 };
 
-void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
-    int n;
-    n = sendto(sock,&packet,sizeof(packet),0,(struct sockaddr *)&cli_addr,clilen);
-    if (n < 0) error("ERROR writing packet to socket"); 
-}
-
 short calCheckSum(struct TCP_PACKET_FORMAT p){
 	int i;
 	short sum = 0;
