@@ -74,8 +74,7 @@ int main(int argc, char *argv[])
 
 void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
     int n;
-
-    n = sendto(sockfd,buffer,strlen(buffer),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
+    n = sendto(sockfd,&packet,sizeof(packet),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) error("ERROR writing to socket");
 }
 
@@ -85,8 +84,8 @@ void dostuff(int sockfd) {
     int n, i, x;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag,ackNumber,ackFlag,windowSize,firstWaitingWin,index,bytes_read;
-    int packetNum = 0;
+    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, bytes_read;
+    //int packetNum = 0;
 
     seqNumber = 0;
     lastFlag  = 0;
@@ -103,24 +102,26 @@ void dostuff(int sockfd) {
 
     // Receive packets from the server
     fp = fopen(buffer, "w");
-    do
+    while (1)
     {
         n = recvfrom(sockfd,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&serv_addr,&servlen); //read from the socket
         if (n < 0) {
             error("ERROR reading from socket");
             break;
         }
-        printf("%d\n",tcp_packet.seqNumber);
-        printf("%d\n",tcp_packet.ackNumber);
-        printf("%d\n",tcp_packet.ackFlag);
-        printf("%d\n",tcp_packet.lastFlag);
-        printf("%s\n",tcp_packet.data);
+        //printf("%d\n",tcp_packet.seqNumber);
+        //printf("%d\n",tcp_packet.ackNumber);
+        //printf("%d\n",tcp_packet.ackFlag);
+        //printf("%d\n",tcp_packet.lastFlag);
+        //printf("%s\n",tcp_packet.data);
+        printf("Client: received packet %d with lastFlag = %d\n", tcp_packet.seqNumber, tcp_packet.lastFlag);
         // mark window as received
         index = 0 + (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
+        window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
 
         // construct an ACK packet
-        seqNumber += tcp_packet.dataLength; //change later
+        //seqNumber += tcp_packet.dataLength;
         ackFlag = 1;
         ackNumber = tcp_packet.seqNumber;
         lastFlag = 1;
@@ -129,25 +130,28 @@ void dostuff(int sockfd) {
         // send the ACK
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         SendPacket(sockfd,ack_packet);
-
-        // Append packet into file
-        fwrite(tcp_packet.data, 1, tcp_packet.dataLength, fp);
+        printf("Client: ACK %d\n", ack_packet.ackNumber);
+        
 
         // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
         firstWaitingWin = 0;
         while (window.packet[firstWaitingWin].seqNumber < 0)
             firstWaitingWin += 1;
         if (firstWaitingWin > 0) {
-            packetNum -= firstWaitingWin;
-            if (packetNum == 0 && lastFlag > 0){
-                break;
-            }
-            for (i = 0; i < packetNum; i++)
+            for (i = 0; i < windowSize-firstWaitingWin; i++)
             {
+                // Append packet about to be shifted out of the window into file; MUST BE IN ORDER
+                fwrite(window.packet[i].data, 1, window.packet[i].dataLength, fp);
+                // end after we write the last packet into file
+                if (window.packet[i].lastFlag == 1) {
+                    close(sockfd);
+                    fclose(fp);
+                    return;
+                }
                 window.packet[i] = window.packet[i+firstWaitingWin];
             }
         }
 
-    } while (tcp_packet.lastFlag == 0); //keep reading files from server until reaches the last packet
-    fclose(fp);
+    }
+
 }
