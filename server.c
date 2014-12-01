@@ -87,6 +87,12 @@ int main(int argc, char *argv[])
  once a connnection has been established.
  *****************************************/
 
+
+void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
+    int n;
+    n = sendto(sock,&packet,sizeof(packet),0,(struct sockaddr *)&cli_addr,clilen);
+    if (n < 0) error("ERROR writing packet to socket"); 
+}
 /* Divide file into packets and send them to the receiver */
 void output_header_and_targeted_file_to_sock(int sock, int resource)
 {
