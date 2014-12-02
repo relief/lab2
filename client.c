@@ -18,7 +18,7 @@ void error(char *msg)
     exit(0);
 }
 
-void dostuff(int); /* function prototype */
+void dostuff(int, float, float); /* function prototype */
 
 char buffer[256];
 struct sockaddr_in serv_addr; 
@@ -65,8 +65,16 @@ int main(int argc, char *argv[])
     if (n < 0) 
          error("ERROR writing to socket");
 
+    float lossRate, corruptionRate;
+    printf("Set the loss rate: ");
+    fgets(buffer, 255, stdin);
+    sscanf(buffer, "%f", &lossRate);
+    printf("Set the corruption rate: ");
+    fgets(buffer, 255, stdin);
+    sscanf(buffer, "%f", &corruptionRate);
+
     //bzero(buffer,256);    
-    dostuff(sockfd);
+    dostuff(sockfd,lossRate,corruptionRate);
     close(sockfd); //close socket
     
     return 0;
@@ -78,7 +86,7 @@ void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
     if (n < 0) error("ERROR writing to socket");
 }
 
-void dostuff(int sockfd) {
+void dostuff(int sockfd, float lossRate, float corruptionRate) {
     FILE *fp; // file requested
 
     int n, i, x;
@@ -116,22 +124,20 @@ void dostuff(int sockfd) {
         window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
 
-/*
         // simulate packet loss by not sending an ACK
-        if (lossCorruptionRate(0.5)) {
+        if (lossCorruptionRate(lossRate)) {
             printf("Packet %d is lost!\n", tcp_packet.seqNumber);
             continue;
         }
 
         // simulate packet corruption by not sending an ACK
-        if (lossCorruptionRate(0.2)) {
+        if (lossCorruptionRate(corruptionRate)) {
             tcp_packet.windowSize -= 10;
             if (calCheckSum(tcp_packet) != tcp_packet.checksum) {
                 printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
                 continue;
             }
         }      
-        */  
 
         // construct an ACK packet
         ackFlag = 1;
