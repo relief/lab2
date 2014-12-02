@@ -3,7 +3,7 @@
 #define TIMEOUT		 1000
 #define LOSS_RATE	 0.1
 #define CORRUPTED_RATE 0.2
-#define RECEIVING_WAITING_TIME 100000
+#define RECEIVING_WAITING_TIME 100
 
 struct TCP_PACKET_FORMAT{
     int seqNumber;
@@ -31,7 +31,7 @@ short calCheckSum(struct TCP_PACKET_FORMAT p){
 	return sum;
 }
 
-int lossByRate(float rate){
+int lossCorruptionRate(float rate){
     float r;
     srand(time(NULL));
     r = (float)rand()/(float)RAND_MAX;

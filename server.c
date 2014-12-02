@@ -167,6 +167,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
           curTime = clock();
           for (i = 0; i < packetNum; i++)
           {
+              printf("Time of %d: %lu\n", i, window.timer[i]);
               if (window.packet[i].seqNumber >= 0 && curTime - window.timer[i] > TIMEOUT)
               {
                   printf("Server: resent packet SeqNum %d\n", window.packet[i].seqNumber);

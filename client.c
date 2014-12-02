@@ -109,19 +109,29 @@ void dostuff(int sockfd) {
             error("ERROR reading from socket");
             break;
         }
-        //printf("%d\n",tcp_packet.seqNumber);
-        //printf("%d\n",tcp_packet.ackNumber);
-        //printf("%d\n",tcp_packet.ackFlag);
-        //printf("%d\n",tcp_packet.lastFlag);
-        //printf("%s\n",tcp_packet.data);
+
         printf("Client: received packet %d with lastFlag = %d\n", tcp_packet.seqNumber, tcp_packet.lastFlag);
         // mark window as received
         index = 0 + (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
         window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
 
+        // simulate packet loss by not sending an ACK
+        if (lossCorruptionRate(0.5)) {
+            printf("Packet %d is lost!\n", tcp_packet.seqNumber);
+            continue;
+        }
+
+        // simulate packet corruption by not sending an ACK
+        if (lossCorruptionRate(0.2)) {
+            tcp_packet.windowSize -= 10;
+            if (calCheckSum(tcp_packet) != tcp_packet.checksum) {
+                printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
+                continue;
+            }
+        }        
+
         // construct an ACK packet
-        //seqNumber += tcp_packet.dataLength;
         ackFlag = 1;
         ackNumber = tcp_packet.seqNumber;
         lastFlag = 1;
@@ -131,7 +141,6 @@ void dostuff(int sockfd) {
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         SendPacket(sockfd,ack_packet);
         printf("Client: ACK %d\n", ack_packet.ackNumber);
-        
 
         // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
         firstWaitingWin = 0;
