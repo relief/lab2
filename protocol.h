@@ -1,5 +1,5 @@
 #define DATA_SIZE_IN_PACKET 1480
-#define WINDOW_SIZE  100
+#define WINDOW_SIZE  4
 #define TIMEOUT		 1000
 #define LOSS_RATE	 0.1
 #define CORRUPTED_RATE 0.2

@@ -97,14 +97,14 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
     int bytes_read,n, i;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, packetNum;
+    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, packetNum, firstSeqNum;
     clock_t start, curTime;
     struct timeval tv;
     
     tv.tv_usec = RECEIVING_WAITING_TIME;
      if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
         perror("Error");
-    }
+    } 
 
     packetNum = 0;
     seqNumber = 0;
@@ -123,7 +123,6 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
                       lastFlag = 1;
                   tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, data_to_send, bytes_read);
                   // Save into window
-                  printf("New packet added into Window! \n");
                   window.packet[packetNum] = tcp_packet;
                   window.timer[packetNum] = clock();
                   packetNum += 1;
@@ -134,22 +133,24 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
               }
           }
           
+          firstSeqNum = window.packet[0].seqNumber;
           //Receive ACK
           while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
               printf("Server rcvd ackFlag: %d\n",ack_packet.ackFlag);
               printf("Server rcvd ackNumber: %d\n",ack_packet.ackNumber);
 
               if (ack_packet.ackFlag == 1) {
-                  index = 0 + (ack_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
+                  index = (ack_packet.ackNumber - firstSeqNum) / DATA_SIZE_IN_PACKET ;  // Take care of the change of the first window packet
                   window.packet[index].seqNumber = -1;  // Marked as ACKed
               }        
           }
 
           // if smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
           firstWaitingWin = 0;
-          while (window.packet[firstWaitingWin].seqNumber < 0)
+          while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < packetNum) // Take care of buffer overflow
               firstWaitingWin += 1;
 
+          //printf("packetNum = %d, lastFlag = %d\n", packetNum, lastFlag );
           if (firstWaitingWin > 0){
               packetNum -= firstWaitingWin;
               if (packetNum == 0 && lastFlag > 0){
@@ -168,6 +169,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
           {
               if (window.packet[i].seqNumber >= 0 && curTime - window.timer[i] > TIMEOUT)
               {
+                  printf("Server: resent packet SeqNum %d\n", window.packet[i].seqNumber);
                   SendPacket(sock,window.packet[i]);
                   window.timer[i] = clock();
               }

@@ -21,7 +21,7 @@ void error(char *msg)
 void dostuff(int); /* function prototype */
 
 char buffer[256];
-struct sockaddr_in serv_addr;
+struct sockaddr_in serv_addr; 
 struct hostent *server; //contains tons of information, including the server's IP address
 socklen_t servlen;
 

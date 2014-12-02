@@ -11,9 +11,9 @@ client: client.o
 server: server.o 
 	$(CC) -o server server.o $(LIBS)
 
-client.o: client.c
+client.o: client.c protocol.h
 
-server.o: server.c
+server.o: server.c protocol.h
 
 clean:
 	rm -f client server client.o server.o 
