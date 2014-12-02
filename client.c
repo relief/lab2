@@ -18,9 +18,11 @@ void error(char *msg)
     exit(0);
 }
 
-void dostuff(int); /* function prototype */
+void dostuff(int, float, float); /* function prototype */
 
 char buffer[256];
+char fileName[256];
+
 struct sockaddr_in serv_addr; 
 struct hostent *server; //contains tons of information, including the server's IP address
 socklen_t servlen;
@@ -55,18 +57,31 @@ int main(int argc, char *argv[])
     serv_addr.sin_port = htons(portno);
     
     printf("Please enter the fileName: ");
-    bzero(buffer,256);
-    fgets(buffer,255,stdin);
-    buffer[strlen(buffer)-1] = '\0';
+    bzero(fileName,256);
+    fgets(fileName,255,stdin);
+    fileName[strlen(fileName)-1] = '\0';
     servlen = sizeof(serv_addr);     
 
     //n = send(sockfd,buffer,strlen(buffer),0); //send to the socket
-    n = sendto(sockfd,buffer,strlen(buffer),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
+
+    float lossRate, corruptionRate;
+    printf("Set the loss rate: ");
+    bzero(buffer,256);
+    fgets(buffer, 255, stdin);
+    sscanf(buffer, "%f", &lossRate);
+
+    printf("Set the corruption rate: ");
+    bzero(buffer,256);
+    fgets(buffer, 255, stdin);
+    sscanf(buffer, "%f", &corruptionRate);
+
+    printf("r1=%f,r2 = %f\n", lossRate,corruptionRate );
+
+    n = sendto(sockfd,fileName,strlen(fileName),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) 
          error("ERROR writing to socket");
-
     //bzero(buffer,256);    
-    dostuff(sockfd);
+    dostuff(sockfd,lossRate,corruptionRate);
     close(sockfd); //close socket
     
     return 0;
@@ -78,7 +93,7 @@ void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
     if (n < 0) error("ERROR writing to socket");
 }
 
-void dostuff(int sockfd) {
+void dostuff(int sockfd, float lossRate, float corruptionRate) {
     FILE *fp; // file requested
 
     int n, i, x;
@@ -101,7 +116,7 @@ void dostuff(int sockfd) {
     }
 
     // Receive packets from the server
-    fp = fopen(buffer, "w");
+    fp = fopen(fileName, "w");
     while (1)
     {
         n = recvfrom(sockfd,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&serv_addr,&servlen); //read from the socket
@@ -113,15 +128,14 @@ void dostuff(int sockfd) {
         printf("Client: received packet %d with lastFlag = %d\n", tcp_packet.seqNumber, tcp_packet.lastFlag);
         // mark window as received
 
-
         // simulate packet loss by not sending an ACK
-        if (lossCorruptionRate(0.5)) {
+        if (lossCorruptionRate(lossRate)) {
             printf("Packet %d is lost!\n", tcp_packet.seqNumber);
             continue;
         }
 
         // simulate packet corruption by not sending an ACK
-        if (lossCorruptionRate(0.2)) {
+        if (lossCorruptionRate(corruptionRate)) {
             tcp_packet.windowSize -= 10;
             if (calCheckSum(tcp_packet) != tcp_packet.checksum) {
                 printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
@@ -132,9 +146,6 @@ void dostuff(int sockfd) {
         index = (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
         window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
-
-
-        
 
         // construct an ACK packet
         ackFlag = 1;
