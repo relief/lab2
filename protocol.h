@@ -1,3 +1,6 @@
+#include <stdlib.h>  // rand(), srand()
+#include <time.h> 
+
 #define DATA_SIZE_IN_PACKET 1480
 #define WINDOW_SIZE  4
 #define TIMEOUT		 1000

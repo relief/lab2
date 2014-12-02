@@ -116,6 +116,7 @@ void dostuff(int sockfd) {
         window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
 
+/*
         // simulate packet loss by not sending an ACK
         if (lossCorruptionRate(0.5)) {
             printf("Packet %d is lost!\n", tcp_packet.seqNumber);
@@ -129,7 +130,8 @@ void dostuff(int sockfd) {
                 printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
                 continue;
             }
-        }        
+        }      
+        */  
 
         // construct an ACK packet
         ackFlag = 1;

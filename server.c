@@ -91,7 +91,7 @@ void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
 }
 
 /* Divide file into packets and send them to the receiver */
-void output_header_and_targeted_file_to_sock(int sock, int resource)
+void send_file_as_packets(int sock, int resource)
 {
     char data_to_send[DATA_SIZE_IN_PACKET]; //the packet's data
     int bytes_read,n, i;
@@ -165,6 +165,7 @@ void output_header_and_targeted_file_to_sock(int sock, int resource)
 
           // If timeout, resend
           curTime = clock();
+          printf("Current time: %lu\n", clock());
           for (i = 0; i < packetNum; i++)
           {
               printf("Time of %d: %lu\n", i, window.timer[i]);
@@ -199,7 +200,7 @@ void dostuff (int sock)
    printf("Here is the filePath: %s$$$\n",filePath);
    if ((resource = open(filePath, O_RDONLY)) > 0){
       printf("The file exists. \n");      
-      output_header_and_targeted_file_to_sock(sock, resource);
+      send_file_as_packets(sock, resource);
    }
    else{
       printf("The file does not exist! \n");
