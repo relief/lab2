@@ -112,11 +112,8 @@ void dostuff(int sockfd) {
 
         printf("Client: received packet %d with lastFlag = %d\n", tcp_packet.seqNumber, tcp_packet.lastFlag);
         // mark window as received
-        index = 0 + (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
-        window.packet[index] = tcp_packet;
-        window.packet[index].seqNumber = -1;
 
-/*
+
         // simulate packet loss by not sending an ACK
         if (lossCorruptionRate(0.5)) {
             printf("Packet %d is lost!\n", tcp_packet.seqNumber);
@@ -131,7 +128,13 @@ void dostuff(int sockfd) {
                 continue;
             }
         }      
-        */  
+
+        index = (tcp_packet.ackNumber - window.packet[0].seqNumber) / DATA_SIZE_IN_PACKET ;
+        window.packet[index] = tcp_packet;
+        window.packet[index].seqNumber = -1;
+
+
+        
 
         // construct an ACK packet
         ackFlag = 1;
@@ -141,15 +144,15 @@ void dostuff(int sockfd) {
 
         // send the ACK
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
-        SendPacket(sockfd,ack_packet);
+        SendPacket(sockfd, ack_packet);
         printf("Client: ACK %d\n", ack_packet.ackNumber);
 
         // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
         firstWaitingWin = 0;
-        while (window.packet[firstWaitingWin].seqNumber < 0)
+        while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < WINDOW_SIZE)
             firstWaitingWin += 1;
         if (firstWaitingWin > 0) {
-            for (i = 0; i < windowSize-firstWaitingWin; i++)
+            for (i = 0; i < firstWaitingWin; i++)
             {
                 // Append packet about to be shifted out of the window into file; MUST BE IN ORDER
                 fwrite(window.packet[i].data, 1, window.packet[i].dataLength, fp);

@@ -3,10 +3,10 @@
 
 #define DATA_SIZE_IN_PACKET 1480
 #define WINDOW_SIZE  4
-#define TIMEOUT		 1000
-#define LOSS_RATE	 0.1
-#define CORRUPTED_RATE 0.2
-#define RECEIVING_WAITING_TIME 100
+#define TIMEOUT		 100
+#define LOSS_RATE	 0.5
+#define CORRUPTED_RATE 0.5
+#define RECEIVING_WAITING_TIME 10000
 
 struct TCP_PACKET_FORMAT{
     int seqNumber;
