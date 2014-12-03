@@ -25,7 +25,8 @@ struct WINDOW_FORMAT
 	clock_t  timer[WINDOW_SIZE];
 };
 
-short calCheckSum(struct TCP_PACKET_FORMAT p){
+/* Calculates the checksum of a packet */
+short calcCheckSum(struct TCP_PACKET_FORMAT p){
 	int i;
 	short sum = 0;
 	sum += p.seqNumber + p.ackNumber + p.ackFlag + p.lastFlag + p.dataLength + p.windowSize;
@@ -34,7 +35,8 @@ short calCheckSum(struct TCP_PACKET_FORMAT p){
 	return sum;
 }
 
-int lossCorruptionRate(float rate){
+/* Determines if a loss or corruption occurs */
+int isLostCorrupted(float rate){
     float r;
     srand(time(NULL));
     r = (float)rand()/(float)RAND_MAX;
