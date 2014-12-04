@@ -2,11 +2,11 @@
 #include <time.h> 
 
 #define DATA_SIZE_IN_PACKET 1480
-#define WINDOW_SIZE  4
+#define WINDOW_SIZE  400
 #define TIMEOUT		 100
 #define LOSS_RATE	 0.5
 #define CORRUPTED_RATE 0.5
-#define RECEIVING_WAITING_TIME 10000
+#define RECEIVING_WAITING_TIME 50 * WINDOW_SIZE
 
 struct TCP_PACKET_FORMAT{
     int seqNumber;
@@ -57,6 +57,8 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
     tcp_packet.dataLength = dataSize;
 
     //printf("sequence number = %d\n", seqNumber);      
+
+
 
     bzero(tcp_packet.data, DATA_SIZE_IN_PACKET);
     for (i = 0; i < dataSize; i++) {

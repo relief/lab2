@@ -208,6 +208,6 @@ void dostuff (int sock)
    //   output_dne(sock, fileName);
    }
 
-   n = sendto(sock,"I got your message",18,0,(struct sockaddr *)&cli_addr,clilen);
-   if (n < 0) error("ERROR writing to socket");
+   //n = sendto(sock,"I got your message",18,0,(struct sockaddr *)&cli_addr,clilen);
+   //if (n < 0) error("ERROR writing to socket");
 }

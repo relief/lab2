@@ -126,6 +126,7 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
             error("ERROR reading from socket");
             break;
         }
+        // mark window as received
 
         // simulate packet loss by not sending an ACK
         if (lossCorruptionRate(lossRate)) {
