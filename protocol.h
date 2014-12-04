@@ -67,7 +67,7 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
        tcp_packet.data[i] = data[i];
     }
 
-    tcp_packet.checksum  = calCheckSum(tcp_packet);
+    tcp_packet.checksum  = calcCheckSum(tcp_packet);
     return tcp_packet;
 }
 
