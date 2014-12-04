@@ -137,11 +137,26 @@ void send_file_as_packets(int sock, int resource)
           firstSeqNum = window.packet[0].seqNumber;
           //Receive ACK
           while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
+
+              // simulate packet loss by not sending an ACK
+              if (isLostCorrupted(LOSS_RATE)) {
+                  printf("ACK Packet %d is lost!\n", ack_packet.seqNumber);
+                  continue;
+              }
+
+              // simulate packet corruption by not sending an ACK
+              if (isLostCorrupted(CORRUPTION_RATE)) {
+                  printf("ACK Packet %d is corrupted!\n", ack_packet.seqNumber);
+                  continue;
+              }      
+
               printf("Server rcvd ackFlag: %d\n",ack_packet.ackFlag);
               printf("Server rcvd ackNumber: %d\n",ack_packet.ackNumber);
 
               if (ack_packet.ackFlag == 1) {
                   index = (ack_packet.ackNumber - firstSeqNum) / DATA_SIZE_IN_PACKET ;  // Take care of the change of the first window packet
+                  if (index < 0 || index >= WINDOW_SIZE)
+                          continue;
                   window.packet[index].seqNumber = -1;  // Marked as ACKed
               }        
           }

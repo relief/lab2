@@ -2,11 +2,11 @@
 #include <time.h> 
 
 #define DATA_SIZE_IN_PACKET 1480
-#define WINDOW_SIZE  400
-#define TIMEOUT		 100
-#define LOSS_RATE	 0.5
-#define CORRUPTED_RATE 0.5
-#define RECEIVING_WAITING_TIME 50 * WINDOW_SIZE
+#define WINDOW_SIZE  40
+#define TIMEOUT		 10
+#define LOSS_RATE	 0.3
+#define CORRUPTION_RATE 0.3
+#define RECEIVING_WAITING_TIME 10000
 
 struct TCP_PACKET_FORMAT{
     int seqNumber;
