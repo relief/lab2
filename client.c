@@ -128,15 +128,15 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         }
 
         // simulate packet loss by not sending an ACK
-        if (lossCorruptionRate(lossRate)) {
+        if (isLostCorrupted(lossRate)) {
             printf("Packet %d is lost!\n", tcp_packet.seqNumber);
             continue;
         }
 
         // simulate packet corruption by not sending an ACK
-        if (lossCorruptionRate(corruptionRate)) {
+        if (isLostCorrupted(corruptionRate)) {
             tcp_packet.windowSize -= 10;
-            if (calCheckSum(tcp_packet) != tcp_packet.checksum) {
+            if (calcCheckSum(tcp_packet) != tcp_packet.checksum) {
                 printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
                 continue;
             }
