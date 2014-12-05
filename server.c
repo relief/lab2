@@ -21,7 +21,7 @@ void sigchld_handler(int s)
     while(waitpid(-1, NULL, WNOHANG) > 0);
 }
 
-void dostuff(int); /* function prototype */
+void dostuff(int, float, float); /* function prototype */
 void error(char *msg)
 {
     perror(msg);
@@ -33,47 +33,66 @@ struct sockaddr_in cli_addr;
 
 int main(int argc, char *argv[])
 {
-     int sockfd, newsockfd, portno;
-     struct sigaction sa;          // for signal SIGCHLD
-     struct sockaddr_in serv_addr;
+    int sockfd, newsockfd, portno;
+    struct sigaction sa;          // for signal SIGCHLD
+    struct sockaddr_in serv_addr;
 
-     if (argc < 2) {
-         fprintf(stderr,"ERROR, no port provided\n");
-         exit(1);
-     }
-     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-     if (sockfd < 0) 
-        error("ERROR opening socket");
-     bzero((char *) &serv_addr, sizeof(serv_addr));
-     portno = atoi(argv[1]);
-     serv_addr.sin_family = AF_INET;
-     serv_addr.sin_addr.s_addr = INADDR_ANY;
-     serv_addr.sin_port = htons(portno);
+    if (argc < 2) {
+        fprintf(stderr,"ERROR, no port provided\n");
+        exit(1);
+    }
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) 
+       error("ERROR opening socket");
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    portno = atoi(argv[1]);
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
      
-     if (bind(sockfd, (struct sockaddr *) &serv_addr,
+    if (bind(sockfd, (struct sockaddr *) &serv_addr,
               sizeof(serv_addr)) < 0) 
               error("ERROR on binding");
      
-     /****** Kill Zombie Processes ******/
-     sa.sa_handler = sigchld_handler; // reap all dead processes
-     sigemptyset(&sa.sa_mask);
-     sa.sa_flags = SA_RESTART;
-     if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-         perror("sigaction");
-         exit(1);
-     }
+    /****** Kill Zombie Processes ******/
+    sa.sa_handler = sigchld_handler; // reap all dead processes
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        perror("sigaction");
+        exit(1);
+    }
      /*********************************/
 
-     while (1) {
-         int n = -1;
-         clilen = sizeof(cli_addr);         
-         bzero(buffer,256);
+    float lossRate, corruptionRate;
+    printf("Set the loss rate: ");
+    bzero(buffer,256);
+    fgets(buffer, 255, stdin);
+    sscanf(buffer, "%f", &lossRate);
+    if (lossRate < 0 || lossRate > 1) {
+        printf("The loss rate must be between 0 and 1\n");
+        return 1;
+    }
 
-         n = recvfrom(sockfd,buffer,255,0,(struct sockaddr *)&cli_addr,&clilen);
-         dostuff(sockfd); 
-     }
+    printf("Set the corruption rate: ");
+    bzero(buffer,256);
+    fgets(buffer, 255, stdin);
+    sscanf(buffer, "%f", &corruptionRate);
+    if (corruptionRate < 0 || corruptionRate > 1) {
+        printf("The corruption rate must be between 0 and 1\n");
+        return 1;
+    }
 
-     return 0; /* we never get here */
+    while (1) {
+        int n = -1;
+        clilen = sizeof(cli_addr);         
+        bzero(buffer,256);
+
+        n = recvfrom(sockfd,buffer,255,0,(struct sockaddr *)&cli_addr,&clilen);
+        dostuff(sockfd, lossRate, corruptionRate); 
+    }
+
+    return 0; /* we never get here */
 }
 
 /******** DOSTUFF() *********************
@@ -131,7 +150,7 @@ void resend_on_timeout(int sock, struct WINDOW_FORMAT *window, int *packetNum) {
 }
 
 /* Divide file into packets and send them to the receiver */
-void send_file_as_packets(int sock, int resource)
+void send_file_as_packets(int sock, int resource, float lossRate, float corruptionRate)
 {
     char data_to_send[DATA_SIZE_IN_PACKET]; //the packet's data
     int n, i;
@@ -178,13 +197,13 @@ void send_file_as_packets(int sock, int resource)
           while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
 
               // simulate packet loss by not sending an ACK
-              if (isLostCorrupted(LOSS_RATE)) {
+              if (isLostCorrupted(lossRate)) {
                   printf("ACK Packet %d is lost!\n", ack_packet.seqNumber);
                   continue;
               }
 
               // simulate packet corruption by not sending an ACK
-              if (isLostCorrupted(CORRUPTION_RATE)) {
+              if (isLostCorrupted(corruptionRate)) {
                   printf("ACK Packet %d is corrupted!\n", ack_packet.seqNumber);
                   continue;
               }      
@@ -236,21 +255,21 @@ void output_dne(int sock, char* fileName)
     if (n < 0) error("ERROR writing to socket");
 }
 
-void dostuff (int sock)
+void dostuff (int sock, float lossRate, float corruptionRate)
 {
    int n;
    char filePath[256];
    int resource;
 
    if (buffer[0] == '\0')
-      return ;
+      return;
    printf("Here is the fileName: %s\n",buffer);
    sprintf(filePath, "resource/%s",buffer);
    printf("Here is the filePath: %s\n",filePath);
    if ((resource = open(filePath, O_RDONLY)) > 0){
       printf("The file exists. \n");      
       n = sendto(sock,"Y",1,0,(struct sockaddr *)&cli_addr,clilen);
-      send_file_as_packets(sock, resource);   
+      send_file_as_packets(sock, resource, lossRate, corruptionRate);   
       printf("The file was sent successfully!\n");
    }
    else{
