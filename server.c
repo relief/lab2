@@ -140,8 +140,8 @@ void resend_on_timeout(int sock, struct WINDOW_FORMAT *window, int *packetNum) {
     {
         if (window->packet[i].seqNumber >= 0 && curTime - window->timer[i] > TIMEOUT)
         {
-            outputTimestamp();
-            printf("Server: resent DATA packet with sequence number %d\n", window->packet[i].seqNumber);
+//            outputTimestamp();
+//            printf("Server: resent DATA packet with sequence number %d\n", window->packet[i].seqNumber);
             send_packet(sock,window->packet[i]);
             window->timer[i] = clock();
         }
@@ -194,23 +194,36 @@ void send_file_as_packets(int sock, int resource, float lossRate, float corrupti
           
           firstSeqNum = window.packet[0].seqNumber;
           //Receive ACK
-          while(recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen) > 0){
+
+          while((n = recvfrom(sock,&ack_packet,sizeof(ack_packet),0,(struct sockaddr *)&cli_addr,&clilen)) >= 0){
 
               // simulate packet loss by not sending an ACK
               if (isLostCorrupted(lossRate)) {
-                  outputTimestamp();
-                  printf("Server: ACK %d is lost!\n", ack_packet.ackNumber);
+                  if (ack_packet.lastFlag == 0)
+                  {
+                    outputTimestamp();
+                    printf("Server: ACK %d is lost!\n", ack_packet.ackNumber);
+                  }
                   continue;
               }
 
               // simulate packet corruption by not sending an ACK
               if (isLostCorrupted(corruptionRate)) {
-                  outputTimestamp();
-                  printf("Server: ACK %d is corrupted!\n", ack_packet.ackNumber);
+                  if (ack_packet.lastFlag == 0)
+                  {
+                    outputTimestamp();
+                    printf("Server: ACK %d is corrupted!\n", ack_packet.ackNumber);
+                  }
                   continue;
               }      
+              if (ack_packet.lastFlag == 1){
+                  outputTimestamp();
+                  printf("Server: The client has finished receiving the file.\n"); 
+                  return ;
+              }
               outputTimestamp();
               printf("Server: received ACK %d\n",ack_packet.ackNumber);
+
 
               if (ack_packet.ackFlag == 1) {
                   // find the index of the ACK packet in the server's window

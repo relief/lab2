@@ -145,7 +145,20 @@ int shift_window(struct WINDOW_FORMAT *window, int lastFlag, int *leftMostSeqNum
     }
     return 0;
 }
-
+void disconnect(int sockfd, FILE *fp, int seqNum)
+{
+    struct TCP_PACKET_FORMAT tcp_packet,ack_packet;
+    struct timeval tv;
+    tv.tv_usec = RECEIVING_WAITING_TIME * 100;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+        perror("Error");
+    } 
+    ack_packet = create_tcp_packet(0, seqNum, 0, 1, 0, NULL, 0);
+    send_packet(sockfd, ack_packet);
+    while (recvfrom(sockfd,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&serv_addr,&servlen) > 0){
+        send_packet(sockfd, ack_packet);
+    }    
+}
 void dostuff(int sockfd, float lossRate, float corruptionRate) {
     FILE *fp; // file requested
 
@@ -211,7 +224,7 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         // Construct an ACK packet
         ackFlag = 1;
         ackNumber = tcp_packet.seqNumber;
-        lastFlag = 1;
+        lastFlag = 0;
         windowSize = tcp_packet.rwnd;
         
         // Send the ACK to the server
@@ -222,10 +235,8 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         
         if (shift_window(&window, lastFlag, &leftMostSeqNum, &fp)) {
             // After shifting out the last data packet, we're done
-            close(sockfd);
-            fclose(fp);
+            disconnect(sockfd, fp,leftMostSeqNum - DATA_SIZE_IN_PACKET);
             return;
         }
     }
-
 }
