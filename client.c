@@ -89,10 +89,38 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void send_packet(int sockfd, struct TCP_PACKET_FORMAT packet){
+void send_packet(int sockfd, struct TCP_PACKET_FORMAT packet) {
     int n;
     n = sendto(sockfd,&packet,sizeof(packet),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) error("ERROR writing to socket");
+}
+
+int shift_window(struct WINDOW_FORMAT *window, int lastFlag, int *leftMostSeqNum, FILE **fp) {
+    // If the smallest window seqNumber is received, shift the window forward by as many received slots as possible
+    int firstWaitingWin = 0;
+    int i;
+    while (window->packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < WINDOW_SIZE)
+        firstWaitingWin += 1;
+    if (firstWaitingWin > 0) {
+        for (i = 0; i < firstWaitingWin; i++)
+        {
+            *leftMostSeqNum += DATA_SIZE_IN_PACKET;
+            // Append packet about to be shifted out of the window into file; MUST BE IN ORDER
+            fwrite(window->packet[i].data, 1, window->packet[i].dataLength, *fp);
+            // end after we write the last packet into file
+            if (window->packet[i].lastFlag == 1) {
+                return 1;
+            }
+        }
+        for (i = 0; i < WINDOW_SIZE; i++)
+        {
+            if (i + firstWaitingWin < WINDOW_SIZE)
+                window->packet[i] = window->packet[i+firstWaitingWin];
+            else
+                window->packet[i].seqNumber = 0;
+        }
+    }
+    return 0;
 }
 
 void dostuff(int sockfd, float lossRate, float corruptionRate) {
@@ -163,33 +191,13 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         send_packet(sockfd, ack_packet);
         printf("Client: ACK %d\n", ack_packet.ackNumber);
-
-        // If the smallest window seqNumber is received, shift the window forward by as many received slots as possible
-        firstWaitingWin = 0;
-        while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < WINDOW_SIZE)
-            firstWaitingWin += 1;
-        if (firstWaitingWin > 0) {
-            for (i = 0; i < firstWaitingWin; i++)
-            {
-                leftMostSeqNum += DATA_SIZE_IN_PACKET;
-                // Append packet about to be shifted out of the window into file; MUST BE IN ORDER
-                fwrite(window.packet[i].data, 1, window.packet[i].dataLength, fp);
-                // end after we write the last packet into file
-                if (window.packet[i].lastFlag == 1) {
-                    close(sockfd);
-                    fclose(fp);
-                    return;
-                }
-            }
-            for (i = 0; i < WINDOW_SIZE; i++)
-            {
-                if (i + firstWaitingWin < WINDOW_SIZE)
-                    window.packet[i] = window.packet[i+firstWaitingWin];
-                else
-                    window.packet[i].seqNumber = 0;
-            }
+        
+        if (shift_window(&window, lastFlag, &leftMostSeqNum, &fp)) {
+            // After shifting out the last data packet, we're done
+            close(sockfd);
+            fclose(fp);
+            return;
         }
-
     }
 
 }
