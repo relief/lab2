@@ -36,12 +36,14 @@ int main(int argc, char *argv[])
     int sockfd; //Socket descriptor
     int portno, n;
     char reply[256];
+    struct timeb start, end;
+    int diff;
 
     if (argc < 4) {
        fprintf(stderr,"usage %s hostname port filename\n", argv[0]);
        exit(0);
     }
-    
+    srand(time(NULL));    
     portno = atoi(argv[2]);
     sockfd = socket(AF_INET, SOCK_DGRAM, 0); //create a new socket
     if (sockfd < 0) 
@@ -94,11 +96,18 @@ int main(int argc, char *argv[])
     n = recvfrom(sockfd,reply,255,0,(struct sockaddr *)&serv_addr,&servlen);
     if (reply[0] == 'Y')
     {
+        ftime(&start);
         dostuff(sockfd,lossRate,corruptionRate);
+        outputTimestamp();
         printf("The file was received successfully!\n");
+        ftime(&end);
+        diff = (int) (1000.0 * (end.time - start.time) + (end.millitm - start.millitm));
+        printf("Time elapsed: %u seconds and %u milliseconds\n", diff / 1000, diff % 1000);
     }else
+    {
+        outputTimestamp();
         printf("The file doesn't exist!\n");
-    
+    }
     close(sockfd); //close socket    
     return 0;
 }
@@ -145,6 +154,7 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
     int seqNumber, lastFlag, ackNumber, ackFlag, index, leftMostSeqNum;
     short bytes_read, windowSize;
+    char filePath[256];
 
     seqNumber = 0;
     lastFlag  = 0;
@@ -161,7 +171,8 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     }
 
     // Receive packets from the server
-    fp = fopen(fileName, "w");
+    sprintf(filePath, "rcvd_%s",fileName);
+    fp = fopen(filePath, "w");
     while (1)
     {
         n = recvfrom(sockfd,&tcp_packet,sizeof(tcp_packet),0,(struct sockaddr *)&serv_addr,&servlen); //read from the socket
@@ -172,25 +183,27 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
 
         // Simulate packet loss by not sending an ACK
         if (isLostCorrupted(lossRate)) {
-            printf("Packet %d is lost!\n", tcp_packet.seqNumber);
+            outputTimestamp();
+            printf("Client: DATA packet %d is lost!\n", tcp_packet.seqNumber);
             continue;
         }
 
         // Simulate packet corruption by not sending an ACK
         if (isLostCorrupted(corruptionRate)) {
             if (calcCheckSum(tcp_packet) != tcp_packet.checksum) {
-                printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
+                outputTimestamp();
+                printf("Client: DATA packet %d is corrupted!\n", tcp_packet.seqNumber);
                 continue;
             }
         }      
-
-        printf("Client: received packet %d with lastFlag = %d\n", tcp_packet.seqNumber, tcp_packet.lastFlag);
+        outputTimestamp();
+        printf("Client: received DATA packet with sequence number %d\n", tcp_packet.seqNumber);
         index = (tcp_packet.seqNumber - leftMostSeqNum) / DATA_SIZE_IN_PACKET ;
         if (index >= WINDOW_SIZE)
             continue;
         if (index >= 0){
-            printf("Received packet's window index = %d\n", index);
-            printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
+            //printf("Received packet's window index = %d\n", index);
+            //printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
             window.packet[index] = tcp_packet;
             window.packet[index].seqNumber = -1;   
         }
@@ -204,7 +217,8 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         // Send the ACK to the server
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         send_packet(sockfd, ack_packet);
-        printf("Client: ACK %d\n", ack_packet.ackNumber);
+        outputTimestamp();
+        printf("Client: sent ACK %d to server\n", ack_packet.ackNumber);
         
         if (shift_window(&window, lastFlag, &leftMostSeqNum, &fp)) {
             // After shifting out the last data packet, we're done

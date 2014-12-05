@@ -1,12 +1,13 @@
 #include <stdlib.h>  // rand(), srand()
 #include <time.h> 
+#include <sys/timeb.h>
 
-#define DATA_SIZE_IN_PACKET 1480
+#define DATA_SIZE_IN_PACKET 1004
 #define WINDOW_SIZE  40
 #define TIMEOUT		 10
 #define LOSS_RATE	 0.3
 #define CORRUPTION_RATE 0.3
-#define RECEIVING_WAITING_TIME 10000
+#define RECEIVING_WAITING_TIME 100
 
 /* The TCP packet consists of a header and a payload
  * seqNumber: sequence number
@@ -49,7 +50,6 @@ short calcCheckSum(struct TCP_PACKET_FORMAT p){
 /* Determines if a loss or corruption occurs according to the input rate */
 int isLostCorrupted(float rate){
     float r;
-    srand(time(NULL));
     r = (float)rand()/(float)RAND_MAX;
     if (r < rate)
         return 1;
@@ -75,7 +75,16 @@ struct TCP_PACKET_FORMAT create_tcp_packet(int seqNumber, int ackNumber, char ac
        tcp_packet.data[i] = data[i];
     }
 
-    tcp_packet.checksum  = calcCheckSum(tcp_packet);
+    tcp_packet.checksum  = 0; //calcCheckSum(tcp_packet);
     return tcp_packet;
+}
+void outputTimestamp()
+{
+  struct timeb tmb;
+  struct tm *ptm;
+ 
+  ftime(&tmb);
+  ptm = localtime(&tmb.time);
+  printf("Current time: %d:%d:%d %d ms\n    ", ptm->tm_hour, ptm->tm_min, ptm->tm_sec, tmb.millitm);
 }
 

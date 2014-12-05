@@ -136,13 +136,12 @@ void resend_on_timeout(int sock, struct WINDOW_FORMAT *window, int *packetNum) {
     int i;
     clock_t curTime = clock();
     
-    printf("Current time: %lu\n", clock());
     for (i = 0; i < *packetNum; i++)
     {
-        printf("Time of %d: %lu\n", i, window->timer[i]);
         if (window->packet[i].seqNumber >= 0 && curTime - window->timer[i] > TIMEOUT)
         {
-            printf("Server: resent packet SeqNum %d\n", window->packet[i].seqNumber);
+            outputTimestamp();
+            printf("Server: resent DATA packet with sequence number %d\n", window->packet[i].seqNumber);
             send_packet(sock,window->packet[i]);
             window->timer[i] = clock();
         }
@@ -187,7 +186,8 @@ void send_file_as_packets(int sock, int resource, float lossRate, float corrupti
                   packetNum += 1;
                   // Send the packet to the client
                   send_packet(sock,tcp_packet);
-                  printf("Server: sent packet SeqNum %d\n", seqNumber);
+                  outputTimestamp();
+                  printf("Server: sent DATA packet with sequence number %d\n", seqNumber);
                   seqNumber += DATA_SIZE_IN_PACKET;
               }
           }
@@ -198,18 +198,19 @@ void send_file_as_packets(int sock, int resource, float lossRate, float corrupti
 
               // simulate packet loss by not sending an ACK
               if (isLostCorrupted(lossRate)) {
-                  printf("ACK Packet %d is lost!\n", ack_packet.seqNumber);
+                  outputTimestamp();
+                  printf("Server: ACK %d is lost!\n", ack_packet.seqNumber);
                   continue;
               }
 
               // simulate packet corruption by not sending an ACK
               if (isLostCorrupted(corruptionRate)) {
-                  printf("ACK Packet %d is corrupted!\n", ack_packet.seqNumber);
+                  outputTimestamp();
+                  printf("Server: ACK %d is corrupted!\n", ack_packet.seqNumber);
                   continue;
               }      
-
-              printf("Server rcvd ackFlag: %d\n",ack_packet.ackFlag);
-              printf("Server rcvd ackNumber: %d\n",ack_packet.ackNumber);
+              outputTimestamp();
+              printf("Server: received ACK %d\n",ack_packet.ackNumber);
 
               if (ack_packet.ackFlag == 1) {
                   // find the index of the ACK packet in the server's window
@@ -219,24 +220,6 @@ void send_file_as_packets(int sock, int resource, float lossRate, float corrupti
                   window.packet[index].seqNumber = -1;  // Marked as ACKed
               }        
           }
-
-          // // If smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
-          // firstWaitingWin = 0;
-          // while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < packetNum) // Take care of buffer overflow
-          //     firstWaitingWin += 1;
-
-          // //printf("packetNum = %d, lastFlag = %d\n", packetNum, lastFlag );
-          // if (firstWaitingWin > 0){
-          //     packetNum -= firstWaitingWin;
-          //     if (packetNum == 0 && lastFlag > 0){
-          //         break;
-          //     }
-          //     for (i = 0; i < packetNum; i++)
-          //     {
-          //         window.packet[i]   = window.packet[i+firstWaitingWin];
-          //         window.timer[i] = window.timer[i+firstWaitingWin];
-          //     }
-          // }
 
           if (shift_window(&window, &packetNum, lastFlag))
             break;
@@ -261,15 +244,19 @@ void dostuff (int sock, float lossRate, float corruptionRate)
    char filePath[256];
    int resource;
 
+   srand(time(NULL));
    if (buffer[0] == '\0')
       return;
    printf("Here is the fileName: %s\n",buffer);
-   sprintf(filePath, "resource/%s",buffer);
+   sprintf(filePath, "%s",buffer);
    printf("Here is the filePath: %s\n",filePath);
+   outputTimestamp();
    if ((resource = open(filePath, O_RDONLY)) > 0){
       printf("The file exists. \n");      
       n = sendto(sock,"Y",1,0,(struct sockaddr *)&cli_addr,clilen);
+
       send_file_as_packets(sock, resource, lossRate, corruptionRate);   
+      outputTimestamp();
       printf("The file was sent successfully!\n");
    }
    else{
