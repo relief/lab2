@@ -219,16 +219,19 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
             //printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
             window.packet[index] = tcp_packet;
             window.packet[index].seqNumber = -1;   
+            ackNumber = tcp_packet.seqNumber;
+        }else{
+            ackNumber = leftMostSeqNum;
         }
 
         // Construct an ACK packet
         ackFlag = 1;
-        ackNumber = tcp_packet.seqNumber;
+        
         lastFlag = 0;
         windowSize = tcp_packet.rwnd;
         
         // Send the ACK to the server
-        ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
+        ack_packet = create_tcp_packet(tcp_packet.seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
         send_packet(sockfd, ack_packet);
         outputTimestamp();
         printf("Client: sent ACK %d to server\n", ack_packet.ackNumber);

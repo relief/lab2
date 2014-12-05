@@ -226,11 +226,17 @@ void send_file_as_packets(int sock, int resource, float lossRate, float corrupti
 
 
               if (ack_packet.ackFlag == 1) {
-                  // find the index of the ACK packet in the server's window
-                  index = (ack_packet.ackNumber - firstSeqNum) / DATA_SIZE_IN_PACKET ;  // Take care of the change of the first window packet
-                  if (index < 0 || index >= WINDOW_SIZE)
-                          continue;
-                  window.packet[index].seqNumber = -1;  // Marked as ACKed
+                  if (ack_packet.seqNumber != ack_packet.ackNumber){
+                      for (i = 0; i < packetNum; i++)
+                          if (window.packet[i].seqNumber < ack_packet.ackNumber)
+                                window.packet[i].seqNumber = -1;
+                  }else{
+                    // find the index of the ACK packet in the server's window
+                    index = (ack_packet.ackNumber - firstSeqNum) / DATA_SIZE_IN_PACKET ;  // Take care of the change of the first window packet
+                    if (index < 0 || index >= WINDOW_SIZE)
+                            continue;
+                    window.packet[index].seqNumber = -1;  // Marked as ACKed
+                  }
               }        
           }
 
