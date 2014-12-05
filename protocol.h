@@ -3,8 +3,8 @@
 #include <sys/timeb.h>
 
 #define DATA_SIZE_IN_PACKET 1008
-#define WINDOW_SIZE  40
-#define TIMEOUT		 10
+#define WINDOW_SIZE  1000
+#define TIMEOUT		 100
 #define RECEIVING_WAITING_TIME 100
 
 /* The TCP packet consists of a header and a payload
