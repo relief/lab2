@@ -16,8 +16,6 @@
 #include <time.h>
 #include "protocol.h"
 
-//struct TCP_PACKET_FORMAT tcp_packet;
-
 void sigchld_handler(int s)
 {
     while(waitpid(-1, NULL, WNOHANG) > 0);
@@ -75,7 +73,6 @@ int main(int argc, char *argv[])
          dostuff(sockfd); 
      //}
 
-     
      return 0; /* we never get here */
 }
 
@@ -85,21 +82,63 @@ int main(int argc, char *argv[])
  once a connnection has been established.
  *****************************************/
 
-void SendPacket(int sock, struct TCP_PACKET_FORMAT packet){
+void send_packet(int sock, struct TCP_PACKET_FORMAT packet){
     int n;
     n = sendto(sock,&packet,sizeof(packet),0,(struct sockaddr *)&cli_addr,clilen);
     if (n < 0) error("ERROR writing packet to socket"); 
+}
+
+/* Shift the window forward as necessary */
+int shift_window(struct WINDOW_FORMAT window, int packetNum, int lastFlag) {
+    // If smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
+    int firstWaitingWin = 0;
+    int i;
+    while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < packetNum) // Take care of buffer overflow
+        firstWaitingWin += 1;
+
+    //printf("packetNum = %d, lastFlag = %d\n", packetNum, lastFlag );
+    if (firstWaitingWin > 0){
+        packetNum -= firstWaitingWin;
+        if (packetNum == 0 && lastFlag > 0){
+            return 1; // error
+        }
+        for (i = 0; i < packetNum; i++)
+        {
+            window.packet[i]   = window.packet[i+firstWaitingWin];
+            window.timer[i] = window.timer[i+firstWaitingWin];
+        }
+    }
+    return 0;
+}
+
+/* Resend any packets that have timed-out without being ACKed */
+void resend_on_timeout(int sock, struct WINDOW_FORMAT window, int packetNum) {
+    // If timeout, resend
+    int i;
+    clock_t curTime = clock();
+    
+    printf("Current time: %lu\n", clock());
+    for (i = 0; i < packetNum; i++)
+    {
+        printf("Time of %d: %lu\n", i, window.timer[i]);
+        if (window.packet[i].seqNumber >= 0 && curTime - window.timer[i] > TIMEOUT)
+        {
+            printf("Server: resent packet SeqNum %d\n", window.packet[i].seqNumber);
+            send_packet(sock,window.packet[i]);
+            window.timer[i] = clock();
+        }
+    }
 }
 
 /* Divide file into packets and send them to the receiver */
 void send_file_as_packets(int sock, int resource)
 {
     char data_to_send[DATA_SIZE_IN_PACKET]; //the packet's data
-    int bytes_read,n, i;
+    int n, i;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, packetNum, firstSeqNum;
-    clock_t start, curTime;
+    int seqNumber, lastFlag, ackNumber, ackFlag, index, packetNum, firstSeqNum;
+    short bytes_read, windowSize;
     struct timeval tv;
     
     tv.tv_usec = RECEIVING_WAITING_TIME;
@@ -107,7 +146,7 @@ void send_file_as_packets(int sock, int resource)
         perror("Error");
     } 
 
-    packetNum = 0;
+    packetNum = 0; // the sequence number of the packet, also the packet's index number in the window
     seqNumber = 0;
     lastFlag  = 0;
     ackNumber = 0;
@@ -127,8 +166,8 @@ void send_file_as_packets(int sock, int resource)
                   window.packet[packetNum] = tcp_packet;
                   window.timer[packetNum] = clock();
                   packetNum += 1;
-                  // Send it
-                  SendPacket(sock,tcp_packet);
+                  // Send the packet to the client
+                  send_packet(sock,tcp_packet);
                   printf("Server: sent packet SeqNum %d\n", seqNumber);
                   seqNumber += DATA_SIZE_IN_PACKET;
               }
@@ -154,6 +193,7 @@ void send_file_as_packets(int sock, int resource)
               printf("Server rcvd ackNumber: %d\n",ack_packet.ackNumber);
 
               if (ack_packet.ackFlag == 1) {
+                  // find the index of the ACK packet in the server's window
                   index = (ack_packet.ackNumber - firstSeqNum) / DATA_SIZE_IN_PACKET ;  // Take care of the change of the first window packet
                   if (index < 0 || index >= WINDOW_SIZE)
                           continue;
@@ -161,37 +201,28 @@ void send_file_as_packets(int sock, int resource)
               }        
           }
 
-          // if smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
-          firstWaitingWin = 0;
-          while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < packetNum) // Take care of buffer overflow
-              firstWaitingWin += 1;
+          // // If smallest window seqNumber is acked, shift window forward by as many acked numbers as possible
+          // firstWaitingWin = 0;
+          // while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < packetNum) // Take care of buffer overflow
+          //     firstWaitingWin += 1;
 
-          //printf("packetNum = %d, lastFlag = %d\n", packetNum, lastFlag );
-          if (firstWaitingWin > 0){
-              packetNum -= firstWaitingWin;
-              if (packetNum == 0 && lastFlag > 0){
-                  break;
-              }
-              for (i = 0; i < packetNum; i++)
-              {
-                  window.packet[i]   = window.packet[i+firstWaitingWin];
-                  window.timer[i] = window.timer[i+firstWaitingWin];
-              }
-          }
+          // //printf("packetNum = %d, lastFlag = %d\n", packetNum, lastFlag );
+          // if (firstWaitingWin > 0){
+          //     packetNum -= firstWaitingWin;
+          //     if (packetNum == 0 && lastFlag > 0){
+          //         break;
+          //     }
+          //     for (i = 0; i < packetNum; i++)
+          //     {
+          //         window.packet[i]   = window.packet[i+firstWaitingWin];
+          //         window.timer[i] = window.timer[i+firstWaitingWin];
+          //     }
+          // }
 
-          // If timeout, resend
-          curTime = clock();
-          printf("Current time: %lu\n", clock());
-          for (i = 0; i < packetNum; i++)
-          {
-              printf("Time of %d: %lu\n", i, window.timer[i]);
-              if (window.packet[i].seqNumber >= 0 && curTime - window.timer[i] > TIMEOUT)
-              {
-                  printf("Server: resent packet SeqNum %d\n", window.packet[i].seqNumber);
-                  SendPacket(sock,window.packet[i]);
-                  window.timer[i] = clock();
-              }
-          }
+          if (shift_window(window, packetNum, lastFlag))
+            break;
+
+          resend_on_timeout(sock, window, packetNum);
     }
 }
 
@@ -213,16 +244,14 @@ void dostuff (int sock)
 
    printf("Here is the fileName: %s\n",buffer);
    sprintf(filePath, "resource/%s",buffer);
-   printf("Here is the filePath: %s$$$\n",filePath);
+   printf("Here is the filePath: %s\n",filePath);
    if ((resource = open(filePath, O_RDONLY)) > 0){
       printf("The file exists. \n");      
       send_file_as_packets(sock, resource);
+      printf("The file was sent successfully!\n");
    }
    else{
       printf("The file does not exist! \n");
-   //   output_dne(sock, fileName);
+      output_dne(sock, buffer);
    }
-
-   //n = sendto(sock,"I got your message",18,0,(struct sockaddr *)&cli_addr,clilen);
-   //if (n < 0) error("ERROR writing to socket");
 }

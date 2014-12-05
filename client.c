@@ -21,7 +21,8 @@ void error(char *msg)
 void dostuff(int, float, float); /* function prototype */
 
 char buffer[256];
-char fileName[256];
+//char fileName[256];
+char *fileName;
 
 struct sockaddr_in serv_addr; 
 struct hostent *server; //contains tons of information, including the server's IP address
@@ -35,8 +36,8 @@ int main(int argc, char *argv[])
     int sockfd; //Socket descriptor
     int portno, n;
 
-    if (argc < 3) {
-       fprintf(stderr,"usage %s hostname port\n", argv[0]);
+    if (argc < 4) {
+       fprintf(stderr,"usage %s hostname port filename\n", argv[0]);
        exit(0);
     }
     
@@ -50,16 +51,18 @@ int main(int argc, char *argv[])
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
     }
+
+    fileName = argv[3];
     
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET; //initialize server's address
     bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
     serv_addr.sin_port = htons(portno);
     
-    printf("Please enter the fileName: ");
-    bzero(fileName,256);
-    fgets(fileName,255,stdin);
-    fileName[strlen(fileName)-1] = '\0';
+    //printf("Please enter the fileName: ");
+    //bzero(fileName,256);
+    //fgets(fileName,255,stdin);
+    fileName[strlen(fileName)] = '\0';
     servlen = sizeof(serv_addr);     
 
     //n = send(sockfd,buffer,strlen(buffer),0); //send to the socket
@@ -75,19 +78,18 @@ int main(int argc, char *argv[])
     fgets(buffer, 255, stdin);
     sscanf(buffer, "%f", &corruptionRate);
 
-    printf("r1=%f,r2 = %f\n", lossRate,corruptionRate );
-
     n = sendto(sockfd,fileName,strlen(fileName),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) 
          error("ERROR writing to socket");
     //bzero(buffer,256);    
     dostuff(sockfd,lossRate,corruptionRate);
+    printf("The file was received successfully!\n");
     close(sockfd); //close socket
     
     return 0;
 }
 
-void SendPacket(int sockfd, struct TCP_PACKET_FORMAT packet){
+void send_packet(int sockfd, struct TCP_PACKET_FORMAT packet){
     int n;
     n = sendto(sockfd,&packet,sizeof(packet),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) error("ERROR writing to socket");
@@ -99,8 +101,8 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     int n, i, x;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag, ackNumber, ackFlag, windowSize, firstWaitingWin, index, bytes_read,leftMostSeqNum;
-    //int packetNum = 0;
+    int seqNumber, lastFlag, ackNumber, ackFlag, firstWaitingWin, index, leftMostSeqNum;
+    short bytes_read, windowSize;
 
     seqNumber = 0;
     lastFlag  = 0;
@@ -127,15 +129,14 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
             break;
         }
 
-        // simulate packet loss by not sending an ACK
+        // Simulate packet loss by not sending an ACK
         if (isLostCorrupted(lossRate)) {
             printf("Packet %d is lost!\n", tcp_packet.seqNumber);
             continue;
         }
 
-        // simulate packet corruption by not sending an ACK
+        // Simulate packet corruption by not sending an ACK
         if (isLostCorrupted(corruptionRate)) {
-            tcp_packet.windowSize -= 10;
             if (calcCheckSum(tcp_packet) != tcp_packet.checksum) {
                 printf("Packet %d is corrupted!\n", tcp_packet.seqNumber);
                 continue;
@@ -147,36 +148,23 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         if (index < 0 || index >= WINDOW_SIZE){
             continue;
         }
-        printf("index = %d\n", index);
-        printf("leftMostSeqNum = %d\n", leftMostSeqNum);
-        printf("-----------------Old window slot----------------\n");
-        printf("window.packet[index].seqNumber = %d\n",window.packet[index].seqNumber);        
-        printf("tcp_packet.seqNumber = %d\n",tcp_packet.seqNumber);        
-        printf("------------------------------------------------\n");
+        printf("Received packet's window index = %d\n", index);
+        printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
         window.packet[index] = tcp_packet;
         window.packet[index].seqNumber = -1;
-        printf("-----------------New window slot----------------\n");
-        printf("window.packet[index].seqNumber = %d\n",window.packet[index].seqNumber);        
-        printf("tcp_packet.seqNumber = %d\n",tcp_packet.seqNumber);        
-        printf("------------------------------------------------\n");
 
-        //Problem around.... 
-
-
-        // construct an ACK packet
+        // Construct an ACK packet
         ackFlag = 1;
         ackNumber = tcp_packet.seqNumber;
         lastFlag = 1;
-        windowSize = tcp_packet.windowSize;
-        printf("-----------------------------------------\n");
-        printf("ackNumber = %d\n",ackNumber);        
-        printf("-----------------------------------------\n");
-        // send the ACK
+        windowSize = tcp_packet.rwnd;
+        
+        // Send the ACK to the server
         ack_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, 0);
-        SendPacket(sockfd, ack_packet);
+        send_packet(sockfd, ack_packet);
         printf("Client: ACK %d\n", ack_packet.ackNumber);
 
-        // if smallest window seqNumber is received, shift window forward by as many received numbers as possible
+        // If the smallest window seqNumber is received, shift the window forward by as many received slots as possible
         firstWaitingWin = 0;
         while (window.packet[firstWaitingWin].seqNumber < 0 && firstWaitingWin < WINDOW_SIZE)
             firstWaitingWin += 1;
