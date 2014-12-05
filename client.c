@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
 
     int sockfd; //Socket descriptor
     int portno, n;
+    char reply[256];
 
     if (argc < 4) {
        fprintf(stderr,"usage %s hostname port filename\n", argv[0]);
@@ -82,10 +83,15 @@ int main(int argc, char *argv[])
     if (n < 0) 
          error("ERROR writing to socket");
     //bzero(buffer,256);    
-    dostuff(sockfd,lossRate,corruptionRate);
-    printf("The file was received successfully!\n");
-    close(sockfd); //close socket
+    n = recvfrom(sockfd,reply,255,0,(struct sockaddr *)&serv_addr,&servlen);
+    if (reply[0] == 'Y')
+    {
+        dostuff(sockfd,lossRate,corruptionRate);
+        printf("The file was received successfully!\n");
+    }else
+        printf("The file doesn't exist!\n");
     
+    close(sockfd); //close socket    
     return 0;
 }
 
