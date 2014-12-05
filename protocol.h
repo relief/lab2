@@ -2,11 +2,9 @@
 #include <time.h> 
 #include <sys/timeb.h>
 
-#define DATA_SIZE_IN_PACKET 1004
+#define DATA_SIZE_IN_PACKET 1008
 #define WINDOW_SIZE  40
 #define TIMEOUT		 10
-#define LOSS_RATE	 0.3
-#define CORRUPTION_RATE 0.3
 #define RECEIVING_WAITING_TIME 100
 
 /* The TCP packet consists of a header and a payload
@@ -16,7 +14,7 @@
  * lastFlag: 1 if the packet is the last packet, 0 for all other packets
  * checksum: used for corruption detection
  * dataLength: length in bytes of the data sent
- * rwind: the receiving window size of the client or server sending the packet
+ * rwnd: the receiving window size of the client or server sending the packet
  * data: the payload
  */
 struct TCP_PACKET_FORMAT{
