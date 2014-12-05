@@ -199,14 +199,14 @@ void send_file_as_packets(int sock, int resource, float lossRate, float corrupti
               // simulate packet loss by not sending an ACK
               if (isLostCorrupted(lossRate)) {
                   outputTimestamp();
-                  printf("Server: ACK %d is lost!\n", ack_packet.seqNumber);
+                  printf("Server: ACK %d is lost!\n", ack_packet.ackNumber);
                   continue;
               }
 
               // simulate packet corruption by not sending an ACK
               if (isLostCorrupted(corruptionRate)) {
                   outputTimestamp();
-                  printf("Server: ACK %d is corrupted!\n", ack_packet.seqNumber);
+                  printf("Server: ACK %d is corrupted!\n", ack_packet.ackNumber);
                   continue;
               }      
               outputTimestamp();
