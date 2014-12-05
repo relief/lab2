@@ -73,11 +73,19 @@ int main(int argc, char *argv[])
     bzero(buffer,256);
     fgets(buffer, 255, stdin);
     sscanf(buffer, "%f", &lossRate);
+    if (lossRate < 0 || lossRate > 1) {
+        printf("The loss rate must be between 0 and 1\n");
+        return 1;
+    }
 
     printf("Set the corruption rate: ");
     bzero(buffer,256);
     fgets(buffer, 255, stdin);
     sscanf(buffer, "%f", &corruptionRate);
+    if (corruptionRate < 0 || corruptionRate > 1) {
+        printf("The corruption rate must be between 0 and 1\n");
+        return 1;
+    }
 
     n = sendto(sockfd,fileName,strlen(fileName),0,(struct sockaddr *)&serv_addr,servlen); //write to the socket
     if (n < 0) 
@@ -135,7 +143,7 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     int n, i, x;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag, ackNumber, ackFlag, firstWaitingWin, index, leftMostSeqNum;
+    int seqNumber, lastFlag, ackNumber, ackFlag, index, leftMostSeqNum;
     short bytes_read, windowSize;
 
     seqNumber = 0;
@@ -144,7 +152,6 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     ackFlag   = 0;
     windowSize = WINDOW_SIZE;
     bytes_read = 0;
-    firstWaitingWin = 0;
     leftMostSeqNum = 0;
 
     // Initialize the client window with blank packets
