@@ -179,13 +179,14 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
 
         printf("Client: received packet %d with lastFlag = %d\n", tcp_packet.seqNumber, tcp_packet.lastFlag);
         index = (tcp_packet.seqNumber - leftMostSeqNum) / DATA_SIZE_IN_PACKET ;
-        if (index < 0 || index >= WINDOW_SIZE){
+        if (index >= WINDOW_SIZE)
             continue;
+        if (index >= 0){
+            printf("Received packet's window index = %d\n", index);
+            printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
+            window.packet[index] = tcp_packet;
+            window.packet[index].seqNumber = -1;   
         }
-        printf("Received packet's window index = %d\n", index);
-        printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
-        window.packet[index] = tcp_packet;
-        window.packet[index].seqNumber = -1;
 
         // Construct an ACK packet
         ackFlag = 1;
