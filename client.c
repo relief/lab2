@@ -118,7 +118,7 @@ void send_packet(int sockfd, struct TCP_PACKET_FORMAT packet) {
     if (n < 0) error("ERROR writing to socket");
 }
 
-int shift_window(struct WINDOW_FORMAT *window, int lastFlag, int *leftMostSeqNum, FILE **fp) {
+int shift_window(struct WINDOW_FORMAT *window, int lastFlag, int *leftMostSeqNum, int *rightMostACKIndex, FILE **fp) {
     // If the smallest window seqNumber is received, shift the window forward by as many received slots as possible
     int firstWaitingWin = 0;
     int i;
@@ -135,13 +135,18 @@ int shift_window(struct WINDOW_FORMAT *window, int lastFlag, int *leftMostSeqNum
                 return 1;
             }
         }
+
         for (i = 0; i < WINDOW_SIZE; i++)
         {
-            if (i + firstWaitingWin < WINDOW_SIZE)
+            if (i + firstWaitingWin <= *rightMostACKIndex)
                 window->packet[i] = window->packet[i+firstWaitingWin];
             else
-                window->packet[i].seqNumber = 0;
+                if (i <= *rightMostACKIndex)
+                    window->packet[i].seqNumber = 0;
+                else
+                    break;
         }
+        *rightMostACKIndex -= firstWaitingWin;
     }
     return 0;
 }
@@ -165,7 +170,7 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     int n, i, x;
     struct WINDOW_FORMAT window;
     struct TCP_PACKET_FORMAT tcp_packet, ack_packet;
-    int seqNumber, lastFlag, ackNumber, ackFlag, index, leftMostSeqNum;
+    int seqNumber, lastFlag, ackNumber, ackFlag, index, leftMostSeqNum,rightMostACKIndex;
     short bytes_read, windowSize;
     char filePath[256];
 
@@ -176,11 +181,11 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
     windowSize = WINDOW_SIZE;
     bytes_read = 0;
     leftMostSeqNum = 0;
+    rightMostACKIndex = -1;
 
     // Initialize the client window with blank packets
     for (x = 0; x < windowSize; x++) {
-        tcp_packet = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, bytes_read);
-        window.packet[x] = tcp_packet;
+        window.packet[x] = create_tcp_packet(seqNumber, ackNumber, ackFlag, lastFlag, windowSize, NULL, bytes_read);
     }
 
     // Receive packets from the server
@@ -219,6 +224,8 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
             //printf("leftMostSeqNum of window = %d\n", leftMostSeqNum);
             window.packet[index] = tcp_packet;
             window.packet[index].seqNumber = -1;   
+            if (index > rightMostACKIndex)
+                rightMostACKIndex = index;
             ackNumber = tcp_packet.seqNumber;
         }else{
             ackNumber = leftMostSeqNum;
@@ -236,7 +243,7 @@ void dostuff(int sockfd, float lossRate, float corruptionRate) {
         outputTimestamp();
         printf("Client: sent ACK %d to server\n", ack_packet.ackNumber);
         
-        if (shift_window(&window, lastFlag, &leftMostSeqNum, &fp)) {
+        if (shift_window(&window, lastFlag, &leftMostSeqNum, &rightMostACKIndex, &fp)) {
             // After shifting out the last data packet, we're done
             disconnect(sockfd, fp,leftMostSeqNum - DATA_SIZE_IN_PACKET);
             return;
